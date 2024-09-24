@@ -1,95 +1,143 @@
 package http
 
 import (
-	"context"
+	"bufio"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
-	"sync"
+	"strings"
 	"syscall"
-	"time"
 )
+
+type HandlerFunc func(ResponseWriter, *Request)
 
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
 
+// Middleware is a function that wraps an HTTP handler.
+type Middleware func(func(ResponseWriter, *Request)) func(ResponseWriter, *Request)
+
 type Server struct {
 	Addr    string
 	Handler Handler
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
 }
 
 func NewServer(addr string, handler Handler) *Server {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		Addr:    addr,
 		Handler: handler,
-		ctx:     ctx,
-		cancel:  cancel,
 	}
+}
+
+// parseRequest parses the incoming HTTP request from a net.Conn and returns a Request object.
+func parseRequest(buffer []byte) (*Request, error) {
+	reader := bufio.NewReader(strings.NewReader(string(buffer)))
+
+	// Read the request line (e.g., "GET /path HTTP/1.1")
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read request line: %w", err)
+	}
+
+	// Parse the request line
+	parts := strings.Fields(line)
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("malformed request line")
+	}
+
+	method := parts[0]
+	rawURL := parts[1]
+	proto := parts[2]
+
+	// XXX: Currently only support HTTP/1.1
+	if proto != "HTTP/1.1" {
+		return nil, fmt.Errorf("unsupported protocol: %s", proto)
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	// Parse headers
+	headers := make(Header)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read header: %w", err)
+		}
+
+		// An empty line marks the end of headers
+		if line == "\r\n" {
+			break
+		}
+
+		// Parse header line (e.g., "Content-Type: text/plain")
+		colonIndex := strings.Index(line, ":")
+		if colonIndex == -1 {
+			return nil, fmt.Errorf("malformed header line")
+		}
+		name := strings.TrimSpace(line[:colonIndex])
+		value := strings.TrimSpace(line[colonIndex+1:])
+		headers[name] = append(headers[name], value)
+	}
+
+	// Parse body (if there is one)
+	var body io.ReadCloser = nil
+	if method == "POST" || method == "PUT" {
+		// Pass the reader itself as the body to be read later
+		body = io.NopCloser(reader)
+	}
+
+	// Construct and return the request
+	return &Request{
+		Method: method,
+		URL:    parsedURL,
+		Proto:  proto,
+		Header: headers,
+		Body:   body,
+	}, nil
 }
 
 func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
-	s.wg.Add(1)
-	defer s.wg.Done()
 
-	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
-	defer cancel()
-
+	// Read request
 	const size = 64 << 10
 	buffer := make([]byte, size)
-
-	done := make(chan error, 1)
-	go func() {
-		n, err := conn.Read(buffer)
-		if err != nil && err != io.EOF {
-			done <- fmt.Errorf("error reading from connection: %w", err)
-			return
-		}
-		buffer = buffer[:n]
-		done <- nil
-	}()
-
-	select {
-	case <-ctx.Done():
-		if s.ctx.Err() != nil {
-			conn.Write([]byte("HTTP/1.1 503 Service Unavailable\r\n\r\n"))
-			fmt.Println("Server unavailable")
-		} else {
-			conn.Write([]byte("HTTP/1.1 408 Request Timeout\r\n\r\n"))
-			fmt.Println("Request timeout")
-		}
+	n, err := conn.Read(buffer)
+	if err != nil && err != io.EOF {
+		fmt.Println("Error reading from connection:", err)
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))))
 		return
-	case err := <-done:
+	}
+
+	// Trim buffer to actual size
+	buffer = buffer[:n]
+
+	// Parse request
+	if n > 0 {
+		req, err := parseRequest(buffer)
 		if err != nil {
-			fmt.Println(err)
-			conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+			fmt.Println("Error parsing request:", err)
+			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
 			return
 		}
 
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	}
-}
+		// Create a ResponseWriter tied to the current connection
+		res := NewResponseWriter(conn)
 
-func (s *Server) serve(ln net.Listener) error {
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			select {
-			case <-s.ctx.Done():
-				s.wg.Wait()
-				return nil
-			default:
-				return err
-			}
-		}
-		go s.handleConn(conn)
+		// Pass the ResponseWriter and Request to the handler
+		s.Handler.ServeHTTP(res, req)
+	} else {
+		// Bad request
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
 	}
 }
 
@@ -99,33 +147,37 @@ func (s *Server) listenAndServe() error {
 		return err
 	}
 	defer ln.Close()
-	return s.serve(ln)
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return err
+		}
+		go s.handleConn(conn)
+	}
 }
 
-func (s *Server) handleSignals() {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		fmt.Println("Shutting down server...")
-		s.cancel()
-	}()
+func (s *Server) handleSignals(quit chan os.Signal) {
+	<-quit
+	fmt.Println("Shutting down server...")
+	os.Exit(0)
 }
 
 func Run(addr string, handler Handler) error {
-	s := NewServer(addr, handler)
-	s.handleSignals()
+	server := NewServer(addr, handler)
 
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- s.listenAndServe()
-	}()
+	// Set up signal catching for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case <-s.ctx.Done():
-		fmt.Println("Server stopped")
-		return nil
-	case err := <-errChan:
-		return err
-	}
+	go server.handleSignals(quit)
+
+	// Start server
+	fmt.Println("Server listening on", addr)
+	return server.listenAndServe()
+}
+
+func Error(w ResponseWriter, m string, statusCode int) {
+	w.WriteHeader(statusCode)
+	fmt.Fprintln(w, m)
 }
