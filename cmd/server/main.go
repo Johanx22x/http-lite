@@ -1,19 +1,32 @@
 package main
 
 import (
+	"flag"
+
+	"github.com/Johanx22x/http-lite/cmd/server/middleware"
 	"github.com/Johanx22x/http-lite/pkg/http"
 )
 
-func helloWorld(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello, World!"))
+var port string
+
+func init() {
+	flag.StringVar(&port, "port", "8080", "Port to listen on")
 }
 
 func main() {
-	mux := http.NewServeMux()
+	// Parse flags
+	flag.Parse()
 
-	mux.HandleFunc("/", helloWorld)
+	dir := "./cmd/server/website"
+	mux := http.NewServeMux(&dir)
 
-	err := http.Run(":8080", mux)
+	mux.Use(http.LoggingMiddleware)
+	mux.Use(middleware.CORS)
+
+	// Routes
+
+	// Start server
+	err := http.Run(":"+port, mux)
 	if err != nil {
 		panic(err)
 	}
