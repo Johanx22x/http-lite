@@ -24,6 +24,12 @@ func main() {
 	mux.Use(middleware.CORS)
 
 	// Routes
+	mux.AddRoute("/api/test", []string{http.GET},
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Hello, World!"))
+		},
+	)
 
 	// Start server
 	err := http.Run(":"+port, mux)
