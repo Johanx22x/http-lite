@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,10 +21,15 @@ type Cookie struct {
 }
 
 // SetCookie writes the Set-Cookie header in the response to set a cookie.
-func SetCookie(w ResponseWriter, cookie *Cookie) {
+func SetCookie(w ResponseWriter, cookie *Cookie) error {
+	if cookie.Name == "" {
+		return errors.New("cookie name cannot be empty")
+	}
+
 	cookieString := cookieToString(cookie)
 	headers := w.Header()
 	headers["Set-Cookie"] = append(headers["Set-Cookie"], cookieString)
+	return nil
 }
 
 // cookieToString converts a Cookie struct to a string following the cookie format.
@@ -62,6 +68,10 @@ func GetCookie(r *Request, name string) (*Cookie, error) {
 	for _, cookie := range r.Header["Cookie"] {
 		if cookieValue, err := parseCookie(cookie, name); err == nil {
 			return cookieValue, nil
+		} else if err == http.ErrNoCookie {
+			continue
+		} else {
+			return nil, err
 		}
 	}
 	return nil, http.ErrNoCookie
@@ -80,12 +90,13 @@ func parseCookie(rawCookie string, name string) (*Cookie, error) {
 }
 
 // DeleteCookie sets a cookie with an expiration in the past, effectively deleting it.
-func DeleteCookie(w ResponseWriter, name string, path string) {
+func DeleteCookie(w ResponseWriter, name string, path string) error {
 	expiredCookie := &Cookie{
 		Name:    name,
 		Value:   "",
 		Path:    path,
 		Expires: time.Unix(0, 0),
+		MaxAge:  -1, // Indicates to delete the cookie
 	}
-	SetCookie(w, expiredCookie)
+	return SetCookie(w, expiredCookie)
 }
