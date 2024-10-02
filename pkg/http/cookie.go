@@ -1,7 +1,9 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -20,7 +22,8 @@ type Cookie struct {
 // SetCookie writes the Set-Cookie header in the response to set a cookie.
 func SetCookie(w ResponseWriter, cookie *Cookie) {
 	cookieString := cookieToString(cookie)
-	w.Header().Add("Set-Cookie", cookieString)
+	headers := w.Header()
+	headers["Set-Cookie"] = append(headers["Set-Cookie"], cookieString)
 }
 
 // cookieToString converts a Cookie struct to a string following the cookie format.
@@ -40,7 +43,7 @@ func cookieToString(cookie *Cookie) string {
 	}
 
 	if cookie.MaxAge > 0 {
-		cookieString += "; Max-Age=" + string(cookie.MaxAge)
+		cookieString += "; Max-Age=" + fmt.Sprint(cookie.MaxAge)
 	}
 
 	if cookie.Secure {
