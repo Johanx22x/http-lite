@@ -269,3 +269,67 @@ func TestConcurrentRequests(t *testing.T) {
 		<-done
 	}
 }
+
+func TestEmptyRequestBody(t *testing.T) {
+	mux := NewServeMux(nil)
+
+	mux.AddRoute("/api/test", []string{POST}, func(w ResponseWriter, r *Request) {
+		if r.Body == nil {
+			w.WriteHeader(StatusBadRequest)
+			w.Write([]byte("Bad Request"))
+			return
+		}
+	})
+
+	req := &Request{
+		Method: POST,
+		URL:    &url.URL{Path: "/api/test"},
+		Body:   nil, // Cuerpo vacío
+	}
+
+	res := &MockResponseWriter{headers: make(Header)}
+
+	mux.ServeHTTP(res, req)
+
+	if res.status != StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", StatusBadRequest, res.status)
+	}
+
+	expectedBody := "Bad Request"
+	if string(res.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(res.body))
+	}
+}
+
+func TestInvalidQueryParameter(t *testing.T) {
+	mux := NewServeMux(nil)
+
+	mux.AddRoute("/api/test", []string{GET}, func(w ResponseWriter, r *Request) {
+		query := r.URL.Query().Get("param")
+		if query != "expected_value" {
+			w.WriteHeader(StatusBadRequest)
+			w.Write([]byte("Invalid parameter"))
+			return
+		}
+		w.WriteHeader(StatusOK)
+		w.Write([]byte("Valid parameter"))
+	})
+
+	req := &Request{
+		Method: GET,
+		URL:    &url.URL{Path: "/api/test", RawQuery: "param=wrong_value"},
+	}
+
+	res := &MockResponseWriter{headers: make(Header)}
+
+	mux.ServeHTTP(res, req)
+
+	if res.status != StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", StatusBadRequest, res.status)
+	}
+
+	expectedBody := "Invalid parameter"
+	if string(res.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(res.body))
+	}
+}
