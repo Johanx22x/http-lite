@@ -96,7 +96,6 @@ func DeleteCookie(w ResponseWriter, name string, path string) error {
 		Value:   "",
 		Path:    path,
 		Expires: time.Unix(0, 0),
-		MaxAge:  -1, // Indicates to delete the cookie
 	}
 	return SetCookie(w, expiredCookie)
 }

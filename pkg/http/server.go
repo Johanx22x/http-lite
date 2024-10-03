@@ -23,8 +23,9 @@ type Handler interface {
 type Middleware func(func(ResponseWriter, *Request)) func(ResponseWriter, *Request)
 
 type Server struct {
-	Addr    string
-	Handler Handler
+	Addr           string
+	Handler        Handler
+	isShuttingDown bool
 }
 
 func NewServer(addr string, handler Handler) *Server {
@@ -151,15 +152,27 @@ func (s *Server) listenAndServe() error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if s.isShuttingDown {
+				fmt.Println("Server has shut down")
+				return http.ErrServerClosed
+			}
 			return err
 		}
 		go s.handleConn(conn)
 	}
 }
 
+func (s *Server) Shutdown() error {
+	s.isShuttingDown = true
+	fmt.Println("Shutting down server...")
+	return nil
+}
+
 func (s *Server) handleSignals(quit chan os.Signal) {
 	<-quit
-	fmt.Println("Shutting down server...")
+	if err := s.Shutdown(); err != nil {
+		fmt.Printf("Error during shutdown: %v\n", err)
+	}
 	os.Exit(0)
 }
 
