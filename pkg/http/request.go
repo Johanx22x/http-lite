@@ -15,3 +15,12 @@ type Request struct {
 	Body    io.ReadCloser
 	Cookies []Cookie
 }
+
+func (r *Request) GetCookie(name string) (*Cookie, error) {
+	for _, cookie := range r.Cookies {
+		if cookie.Name == name {
+			return &cookie, nil
+		}
+	}
+	return nil, ErrCookieNotFound
+}
