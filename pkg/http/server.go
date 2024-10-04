@@ -17,8 +17,11 @@ import (
 	"time"
 )
 
+// HandlerFunc is a function that handles an HTTP request.
 type HandlerFunc func(ResponseWriter, *Request)
 
+// ServeHTTP calls f(w, r).
+// It's used to satisfy the Handler interface.
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
@@ -33,6 +36,7 @@ type Server struct {
 	wg      sync.WaitGroup
 }
 
+// NewServer creates a new HTTP server with the given address and handler.
 func NewServer(addr string, handler Handler) *Server {
 	return &Server{
 		Addr:    addr,
@@ -40,6 +44,7 @@ func NewServer(addr string, handler Handler) *Server {
 	}
 }
 
+// parseRequest reads and parses an HTTP request from a connection.
 func parseRequest(ctx context.Context, conn net.Conn) (*Request, error) {
 	reader := bufio.NewReader(conn)
 
@@ -61,6 +66,7 @@ func parseRequest(ctx context.Context, conn net.Conn) (*Request, error) {
 	}
 }
 
+// parseRequestWithTimeout reads and parses an HTTP request from a connection with a timeout.
 func parseRequestWithTimeout(reader *bufio.Reader) (*Request, error) {
 	// Read the request line (e.g., "GET /path HTTP/1.1")
 	line, err := reader.ReadString('\n')
@@ -130,6 +136,7 @@ func parseRequestWithTimeout(reader *bufio.Reader) (*Request, error) {
 	}, nil
 }
 
+// parseCookies parses a cookie header string and returns a slice of cookies.
 func parseCookies(cookieHeader string) []Cookie {
 	var cookies []Cookie
 	parts := strings.Split(cookieHeader, ";")
@@ -142,6 +149,7 @@ func parseCookies(cookieHeader string) []Cookie {
 	return cookies
 }
 
+// handleConn reads and parses an HTTP request from a connection and calls the handler.
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	s.wg.Add(1)
@@ -165,6 +173,7 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	s.Handler.ServeHTTP(res, req)
 }
 
+// listenAndServe listens on the TCP network address and handles incoming connections.
 func (s *Server) listenAndServe() error {
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -197,12 +206,14 @@ func (s *Server) Shutdown() {
 	s.wg.Wait() // Wait for all connections to finish
 }
 
+// handleSignals listens for SIGINT and SIGTERM signals to gracefully shutdown the server
 func (s *Server) handleSignals(quit chan os.Signal) {
 	<-quit
 	s.Shutdown()
 	os.Exit(0)
 }
 
+// Run starts an HTTP server with the given address and handler.
 func Run(addr string, handler Handler) error {
 	server := NewServer(addr, handler)
 
@@ -217,6 +228,7 @@ func Run(addr string, handler Handler) error {
 	return server.listenAndServe()
 }
 
+// Error writes an HTTP error response with the given message and status code.
 func Error(w ResponseWriter, m string, statusCode int) {
 	w.WriteHeader(statusCode)
 	fmt.Fprintln(w, m)

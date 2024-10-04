@@ -16,6 +16,7 @@ type Request struct {
 	Cookies []Cookie
 }
 
+// GetCookie returns a cookie by name.
 func (r *Request) GetCookie(name string) (*Cookie, error) {
 	for _, cookie := range r.Cookies {
 		if cookie.Name == name {

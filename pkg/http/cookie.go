@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Cookie represents an HTTP cookie.
 type Cookie struct {
 	Name     string
 	Value    string
@@ -16,6 +17,7 @@ type Cookie struct {
 	HttpOnly bool
 }
 
+// String returns a string representation of the cookie.
 func (c *Cookie) String() string {
 	cookieStr := c.Name + "=" + c.Value
 	if c.Path != "" {

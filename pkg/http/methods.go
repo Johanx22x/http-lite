@@ -1,5 +1,6 @@
 package http
 
+// Methods
 const (
 	GET    = "GET"
 	POST   = "POST"
