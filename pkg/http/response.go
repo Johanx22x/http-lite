@@ -21,6 +21,7 @@ type ResponseWriter interface {
 	Write([]byte) (int, error)
 	WriteHeader(int)
 	SetCookie(*Cookie)
+	DeleteCookie(string)
 }
 
 // Write writes the data to the connection as part of an HTTP reply.
@@ -61,7 +62,13 @@ func (r *Response) Header() Header {
 
 // SetCookie adds a cookie to the response headers.
 func (r *Response) SetCookie(c *Cookie) {
-	r.Headers["Set-Cookie"] = append(r.Headers["Set-Cookie"], c.String())
+	r.Headers.Set("Set-Cookie", c.String())
+}
+
+// DeleteCookie deletes a cookie from the response headers.
+func (r *Response) DeleteCookie(name string) {
+	c := &Cookie{Name: name, Value: "", MaxAge: -1}
+	r.Headers.Set("Set-Cookie", c.String())
 }
 
 // NewResponseWriter creates a new ResponseWriter.

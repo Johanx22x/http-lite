@@ -65,6 +65,10 @@ func parseRequestWithTimeout(reader *bufio.Reader) (*Request, error) {
 	// Read the request line (e.g., "GET /path HTTP/1.1")
 	line, err := reader.ReadString('\n')
 	if err != nil {
+		if err == io.EOF {
+			return nil, err
+		}
+
 		return nil, fmt.Errorf("failed to read request line: %w", err)
 	}
 
@@ -144,7 +148,11 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer s.wg.Done()
 
 	req, err := parseRequest(ctx, conn)
-	if err != nil && err != io.EOF {
+	if err != nil {
+		if err == io.EOF {
+			return
+		}
+
 		fmt.Println("Error parsing request:", err)
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
 		return

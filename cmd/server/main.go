@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"log"
 	"math/rand"
+	"os"
 	"strconv"
 	"time"
 
@@ -37,7 +39,7 @@ func main() {
 			w.SetCookie(&http.Cookie{Name: "last-rate", Value: strconv.Itoa(rate), Expires: time.Now().Add(24 * time.Hour)})
 
 			// Write the response
-			w.Header()["Content-Type"] = []string{"application/json"}
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(response))
 		},
@@ -46,6 +48,7 @@ func main() {
 	// Start server
 	err := http.Run(":"+port, mux)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Error al iniciar el servidor: %v", err)
+		os.Exit(1)
 	}
 }
