@@ -39,6 +39,11 @@ func NewServeMux(staticDir *string) *ServeMux {
 	}
 }
 
+// SetStaticDir establece el directorio estático para el ServeMux.
+func (mux *ServeMux) SetStaticDir(staticDir string) {
+	mux.staticDir = &staticDir
+}
+
 // getOrCreateChild fetches or creates a child node.
 func (mux *ServeMux) getOrCreateChild(node *RouteNode, segment string) *RouteNode {
 	child, exists := mux.getChild(node, segment)
@@ -137,6 +142,18 @@ func (mux *ServeMux) AddRoute(pattern string, methods []string, handler func(Res
 	for _, method := range methods {
 		currentNode.handler[method] = handler
 	}
+}
+
+// Handle asigna un manejador a la ruta especificada para todos los métodos HTTP.
+func (mux *ServeMux) Handle(pattern string, handler func(ResponseWriter, *Request)) {
+	// Aplicar middleware al manejador
+	for _, mw := range mux.middleware {
+		handler = mw(handler)
+	}
+
+	// Asignar la ruta utilizando todos los métodos HTTP
+	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+	mux.AddRoute(pattern, methods, handler)
 }
 
 // ServeHTTP dispatches the request to the appropriate handler by traversing the route tree.
