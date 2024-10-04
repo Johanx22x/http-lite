@@ -67,6 +67,7 @@ func parseRequest(buffer []byte) (*Request, error) {
 
 	// Parse headers
 	headers := make(Header)
+	var cookies []Cookie
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -78,31 +79,39 @@ func parseRequest(buffer []byte) (*Request, error) {
 			break
 		}
 
-		// Parse header line (e.g., "Content-Type: text/plain")
-		colonIndex := strings.Index(line, ":")
-		if colonIndex == -1 {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
 			return nil, fmt.Errorf("malformed header line")
 		}
-		name := strings.TrimSpace(line[:colonIndex])
-		value := strings.TrimSpace(line[colonIndex+1:])
-		headers[name] = append(headers[name], value)
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		headers[key] = append(headers[key], value)
+
+		if key == "Cookie" {
+			cookies = append(cookies, parseCookies(value)...)
+		}
 	}
 
-	// Parse body (if there is one)
-	var body io.ReadCloser = nil
-	if method == "POST" || method == "PUT" {
-		// Pass the reader itself as the body to be read later
-		body = io.NopCloser(reader)
-	}
-
-	// Construct and return the request
 	return &Request{
-		Method: method,
-		URL:    parsedURL,
-		Proto:  proto,
-		Header: headers,
-		Body:   body,
+		Method:  method,
+		URL:     parsedURL,
+		Proto:   proto,
+		Header:  headers,
+		Cookies: cookies,
 	}, nil
+}
+
+func parseCookies(cookieHeader string) []Cookie {
+	var cookies []Cookie
+	parts := strings.Split(cookieHeader, ";")
+	for _, part := range parts {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) == 2 {
+			cookies = append(cookies, Cookie{Name: kv[0], Value: kv[1]})
+		}
+	}
+	return cookies
 }
 
 func (s *Server) handleConn(conn net.Conn) {

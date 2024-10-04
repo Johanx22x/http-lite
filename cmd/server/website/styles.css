@@ -42,3 +42,9 @@ button {
 button:hover {
     background-color: #0056b3; /* Azul más oscuro */
 }
+
+.message {
+    font-size: 18px;
+    color: #dc3545; /* Rojo */
+    margin-top: 20px;
+}

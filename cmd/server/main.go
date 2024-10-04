@@ -4,6 +4,7 @@ import (
 	"flag"
 	"math/rand"
 	"strconv"
+	"time"
 
 	"github.com/Johanx22x/http-lite/cmd/server/middleware"
 	"github.com/Johanx22x/http-lite/pkg/http"
@@ -32,8 +33,12 @@ func main() {
 			rate := 550 + rand.Intn(100) - 50
 			response := `{"rate": ` + strconv.Itoa(rate) + `}`
 
-			w.WriteHeader(http.StatusOK)
+			// Set the rate in a cookie
+			w.SetCookie(&http.Cookie{Name: "last-rate", Value: strconv.Itoa(rate), Expires: time.Now().Add(24 * time.Hour)})
+
+			// Write the response
 			w.Header()["Content-Type"] = []string{"application/json"}
+			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(response))
 		},
 	)
