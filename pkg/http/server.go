@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -143,7 +144,8 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer s.wg.Done()
 
 	req, err := parseRequest(ctx, conn)
-	if err != nil {
+	if err != nil && err != io.EOF {
+		fmt.Println("Error parsing request:", err)
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
 		return
 	}
