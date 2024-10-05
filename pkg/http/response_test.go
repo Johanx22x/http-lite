@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestWriteHeader verifica que WriteHeader escriba correctamente los encabezados de la respuesta.
+// TestWriteHeader verifies that WriteHeader correctly writes the response headers.
 func TestWriteHeader(t *testing.T) {
 	conn := &MockConn{}
 	writer := NewResponseWriter(conn)
@@ -19,7 +19,7 @@ func TestWriteHeader(t *testing.T) {
 	}
 }
 
-// TestWrite verifica que Write escriba los datos en la conexión.
+// TestWrite verifies that Write writes the data to the connection.
 func TestWrite(t *testing.T) {
 	conn := &MockConn{}
 	writer := NewResponseWriter(conn)
@@ -44,13 +44,13 @@ func TestWrite(t *testing.T) {
 	}
 }
 
-// TestWriteHeaderAlreadySent verifica que no se escriba el encabezado de la respuesta más de una vez.
+// TestWriteHeaderAlreadySent verifies that the response header is not written more than once.
 func TestWriteHeaderAlreadySent(t *testing.T) {
 	conn := &MockConn{}
 	writer := NewResponseWriter(conn)
 
 	writer.WriteHeader(StatusOK)
-	writer.WriteHeader(StatusBadRequest) // No debería sobrescribir el encabezado ya enviado
+	writer.WriteHeader(StatusBadRequest) // Should not overwrite the already sent header
 
 	expectedOutput := "HTTP/1.1 200 OK\r\n\r\n"
 	actualOutput := conn.writeBuffer.String()
