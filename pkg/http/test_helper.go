@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+// MockHandler simula un handler para pruebas. Este implementa la interfaz Handler.
+type MockHandler struct{}
+
+// ServeHTTP simula la respuesta HTTP que sería enviada al cliente.
+func (m *MockHandler) ServeHTTP(w ResponseWriter, r *Request) {
+	w.WriteHeader(StatusOK)          // Simula que el handler siempre devuelve un estado 200 OK.
+	w.Write([]byte("Mock response")) // Simula una respuesta con un cuerpo "Mock response".
+}
+
 // MockConn simula una conexión de red para pruebas.
 type MockConn struct {
 	writeBuffer bytes.Buffer
