@@ -127,12 +127,17 @@ func parseRequestWithTimeout(reader *bufio.Reader) (*Request, error) {
 		}
 	}
 
+	// The request body is the remaining data in the reader
+	// Convert the reader to an io.ReadCloser
+	body := io.NopCloser(reader)
+
 	return &Request{
 		Method:  method,
 		URL:     parsedURL,
 		Proto:   proto,
 		Header:  headers,
 		Cookies: cookies,
+		Body:    body,
 	}, nil
 }
 
