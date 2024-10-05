@@ -30,16 +30,16 @@ func TestSetCookie(t *testing.T) {
 
 	res := &MockResponseWriter{headers: make(Header)}
 
-	// Simular la solicitud
+	// Simulate the request
 	mux.ServeHTTP(res, req)
 
-	// Verificar que la cookie se ha enviado en la respuesta
+	// Verify that the cookie was set in the response
 	setCookieHeader := res.Header()["Set-Cookie"]
 	if len(setCookieHeader) == 0 {
 		t.Errorf("Expected a Set-Cookie header")
 	}
 
-	// Verificar el valor de la cookie
+	// Verify the value of the cookie
 	expected := "session_id=abc123"
 	if setCookieHeader[0][:len(expected)] != expected {
 		t.Errorf("Expected Set-Cookie to contain '%s', but got '%s'", expected, setCookieHeader[0])
@@ -54,10 +54,10 @@ func TestGetCookie(t *testing.T) {
 		Header: make(Header),
 	}
 
-	// Simular que el cliente guarda la cookie y la envía en la siguiente solicitud
+	// Simulate that the client saves the cookie and sends it in the next request
 	req.Cookies = append(req.Cookies, Cookie{Name: "session_id", Value: "abc123"})
 
-	// Recuperar la cookie del objeto Request
+	// Retrieve the cookie from the Request object
 	cookieValue, err := req.GetCookie("session_id")
 	if err != nil || cookieValue.Value != "abc123" {
 		t.Errorf("Expected session_id=abc123, got %v", cookieValue)
@@ -68,7 +68,7 @@ func TestGetCookie(t *testing.T) {
 func TestDeleteCookie(t *testing.T) {
 	mux := NewServeMux(nil)
 
-	// Ruta para establecer la cookie
+	// Route to set the cookie
 	mux.AddRoute("/set-cookie", []string{GET}, func(w ResponseWriter, r *Request) {
 		cookie := &Cookie{
 			Name:     "session_id",
@@ -81,7 +81,7 @@ func TestDeleteCookie(t *testing.T) {
 		w.WriteHeader(StatusOK)
 	})
 
-	// Simula la solicitud para establecer la cookie
+	// Simulate the request to set the cookie
 	reqSet := &Request{
 		Method: GET,
 		URL:    &url.URL{Path: "/set-cookie"},
@@ -91,18 +91,18 @@ func TestDeleteCookie(t *testing.T) {
 	resSet := &MockResponseWriter{headers: make(Header)}
 	mux.ServeHTTP(resSet, reqSet)
 
-	// Verificar que la cookie se ha enviado en la respuesta
+	// Verify that the cookie was sent in the response
 	if len(resSet.Header()["Set-Cookie"]) == 0 {
 		t.Errorf("Expected a Set-Cookie header")
 	}
 
-	// Ahora vamos a eliminar la cookie
+	// Now let's delete the cookie
 	mux.AddRoute("/delete-cookie", []string{GET}, func(w ResponseWriter, r *Request) {
 		w.DeleteCookie("session_id")
 		w.WriteHeader(StatusOK)
 	})
 
-	// Simula la solicitud para eliminar la cookie
+	// Simulate the request to delete the cookie
 	reqDel := &Request{
 		Method: GET,
 		URL:    &url.URL{Path: "/delete-cookie"},
@@ -112,13 +112,13 @@ func TestDeleteCookie(t *testing.T) {
 	resDel := &MockResponseWriter{headers: make(Header)}
 	mux.ServeHTTP(resDel, reqDel)
 
-	// Verificar que se haya establecido correctamente la cookie de eliminación
+	// Verify that the delete cookie header was set correctly
 	setCookieHeader := resDel.Header()["Set-Cookie"]
 	if len(setCookieHeader) == 0 {
 		t.Errorf("Expected Set-Cookie header to be present")
 	}
 
-	// Verifica que el encabezado Set-Cookie contenga la información correcta
+	// Verify that the Set-Cookie header contains the correct information
 	expected := "session_id="
 	if setCookieHeader[0][:len(expected)] != expected {
 		t.Errorf("Expected Set-Cookie to contain '%s', but got '%s'", expected, setCookieHeader[0])
@@ -133,7 +133,7 @@ func TestGetNonExistentCookie(t *testing.T) {
 		Header: make(Header),
 	}
 
-	// Intentar recuperar una cookie que no existe
+	// Attempt to retrieve a cookie that does not exist
 	_, err := req.GetCookie("non_existent_cookie")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
@@ -141,5 +141,67 @@ func TestGetNonExistentCookie(t *testing.T) {
 
 	if err != ErrCookieNotFound {
 		t.Errorf("Expected ErrCookieNotFound, got %v", err)
+	}
+}
+
+func TestCookieStringNoOptionalFields(t *testing.T) {
+	cookie := &Cookie{
+		Name:  "test",
+		Value: "123",
+	}
+
+	expected := "test=123"
+	result := cookie.String()
+
+	if result != expected {
+		t.Errorf("Expected '%s', got '%s'", expected, result)
+	}
+}
+
+func TestCookieStringSomeOptionalFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		cookie   Cookie
+		expected string
+	}{
+		{
+			name: "Cookie with Path and Secure",
+			cookie: Cookie{
+				Name:   "test",
+				Value:  "123",
+				Path:   "/",
+				Secure: true,
+			},
+			expected: "test=123; Path=/; Secure",
+		},
+		{
+			name: "Cookie with Domain and HttpOnly",
+			cookie: Cookie{
+				Name:     "test",
+				Value:    "123",
+				Domain:   "example.com",
+				HttpOnly: true,
+			},
+			expected: "test=123; Domain=example.com; HttpOnly",
+		},
+		{
+			name: "Cookie with MaxAge and Expires",
+			cookie: Cookie{
+				Name:    "test",
+				Value:   "123",
+				MaxAge:  3600,
+				Expires: time.Date(2024, 10, 4, 0, 0, 0, 0, time.UTC),
+			},
+			expected: "test=123; Expires=Fri, 04 Oct 2024 00:00:00 UTC; Max-Age=3600",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.cookie.String()
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestServeStaticFile verifica que el servidor puede servir un archivo estático.
+// TestServeStaticFile verifies that the server can serve a static file.
 func TestServeStaticFile(t *testing.T) {
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "testfile.html")
@@ -18,7 +18,7 @@ func TestServeStaticFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary static file: %v", err)
 	}
-	defer os.Remove(tmpFile) // Limpia el archivo después de la prueba
+	defer os.Remove(tmpFile) // Clean up the file after the test
 
 	mux := NewServeMux(&tmpDir)
 
@@ -46,7 +46,7 @@ func TestServeStaticFile(t *testing.T) {
 	}
 }
 
-// TestServeStaticFileNotFound verifica que se devuelve un 404 si el archivo no existe.
+// TestServeStaticFileNotFound verifies that a 404 is returned if the file does not exist.
 func TestServeStaticFileNotFound(t *testing.T) {
 	tmpDir := os.TempDir()
 
@@ -71,7 +71,7 @@ func TestServeStaticFileNotFound(t *testing.T) {
 	}
 }
 
-// TestServeIndexFile verifica que el servidor sirve index.html cuando se accede a una ruta raíz.
+// TestServeIndexFile verifies that the server serves index.html when accessing a root path.
 func TestServeIndexFile(t *testing.T) {
 	tmpDir := os.TempDir()
 	indexFile := filepath.Join(tmpDir, "index.html")
@@ -81,7 +81,7 @@ func TestServeIndexFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary index file: %v", err)
 	}
-	defer os.Remove(indexFile) // Limpia el archivo después de la prueba
+	defer os.Remove(indexFile) // Clean up the file after the test
 
 	mux := NewServeMux(&tmpDir)
 
@@ -103,7 +103,7 @@ func TestServeIndexFile(t *testing.T) {
 	}
 }
 
-// TestServeStaticFileWithCustomExtension verifica que se sirvan archivos con extensiones personalizadas.
+// TestServeStaticFileWithCustomExtension verifies that files with custom extensions are served.
 func TestServeStaticFileWithCustomExtension(t *testing.T) {
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "customfile.xyz")
@@ -141,9 +141,9 @@ func TestServeStaticFileWithCustomExtension(t *testing.T) {
 	}
 }
 
-// TestServeStaticFileWithError verifica el manejo de errores al intentar leer un archivo inexistente.
+// TestServeStaticFileWithError verifies error handling when trying to read a non-existent file.
 func TestServeStaticFileWithError(t *testing.T) {
-	mux := NewServeMux(nil) // No se configura ningún directorio estático
+	mux := NewServeMux(nil) // No static directory configured
 
 	req := &Request{
 		Method: GET,
@@ -164,9 +164,9 @@ func TestServeStaticFileWithError(t *testing.T) {
 	}
 }
 
-// TestServeEmptyStaticDir verifica que el servidor maneje correctamente un directorio vacío.
+// TestServeEmptyStaticDir verifies that the server correctly handles an empty directory.
 func TestServeEmptyStaticDir(t *testing.T) {
-	tmpDir := os.TempDir() // Usamos el directorio temporal vacío
+	tmpDir := os.TempDir() // Use the empty temporary directory
 
 	mux := NewServeMux(&tmpDir)
 

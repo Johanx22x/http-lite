@@ -8,19 +8,19 @@ import (
 func TestHeaderSet(t *testing.T) {
 	headers := make(Header)
 
-	// Probar la inserción de un nuevo encabezado
+	// Test inserting a new header
 	headers.Set("Content-Type", "application/json")
 	if len(headers["Content-Type"]) != 1 || headers["Content-Type"][0] != "application/json" {
 		t.Errorf("Expected Content-Type to be 'application/json', got %v", headers["Content-Type"])
 	}
 
-	// Probar la actualización del encabezado existente
+	// Test updating the existing header
 	headers.Set("Content-Type", "text/html")
 	if len(headers["Content-Type"]) != 2 {
 		t.Errorf("Expected Content-Type to have 2 values, got %d", len(headers["Content-Type"]))
 	}
 
-	// Comprobar si el último valor es el correcto
+	// Check if the last value is correct
 	if headers["Content-Type"][1] != "text/html" {
 		t.Errorf("Expected Content-Type[1] to be 'text/html', got '%s'", headers["Content-Type"][1])
 	}
@@ -30,17 +30,17 @@ func TestHeaderSet(t *testing.T) {
 func TestHeaderGet(t *testing.T) {
 	headers := make(Header)
 
-	// Añadir encabezados
+	// Add headers
 	headers.Set("X-Custom-Header", "Value1")
 	headers.Set("X-Custom-Header", "Value2")
 
-	// Obtener el valor del encabezado (debe devolver el primero)
+	// Get the header value (should return the first one)
 	value := headers.Get("X-Custom-Header")
 	if value != "Value1" {
 		t.Errorf("Expected 'Value1', got '%s'", value)
 	}
 
-	// Probar obtener un encabezado inexistente
+	// Test getting a non-existent header
 	nonExistent := headers.Get("Non-Existent-Header")
 	if nonExistent != "" {
 		t.Errorf("Expected empty string for non-existent header, got '%s'", nonExistent)
@@ -51,16 +51,16 @@ func TestHeaderGet(t *testing.T) {
 func TestMultipleHeaders(t *testing.T) {
 	headers := make(Header)
 
-	// Añadir varios valores a un encabezado
+	// Add multiple values to a header
 	headers.Set("Accept", "text/html")
 	headers.Set("Accept", "application/json")
 
-	// Verificar que ambos valores están presentes
+	// Verify that both values are present
 	if len(headers["Accept"]) != 2 {
 		t.Errorf("Expected 2 values for 'Accept', got %d", len(headers["Accept"]))
 	}
 
-	// Verificar el orden de los valores
+	// Verify the order of the values
 	if headers["Accept"][0] != "text/html" || headers["Accept"][1] != "application/json" {
 		t.Errorf("Expected 'Accept' to contain 'text/html' and 'application/json', got %v", headers["Accept"])
 	}
@@ -70,16 +70,16 @@ func TestMultipleHeaders(t *testing.T) {
 func TestHeaderOverwrite(t *testing.T) {
 	headers := make(Header)
 
-	// Añadir un encabezado y luego otro con el mismo nombre
+	// Add a header and then another with the same name
 	headers.Set("Cache-Control", "no-cache")
 	headers.Set("Cache-Control", "max-age=3600")
 
-	// Verificar que ambos valores están presentes
+	// Verify that both values are present
 	if len(headers["Cache-Control"]) != 2 {
 		t.Errorf("Expected 2 values for 'Cache-Control', got %d", len(headers["Cache-Control"]))
 	}
 
-	// Verificar que los valores son correctos
+	// Verify that the values are correct
 	expectedValues := []string{"no-cache", "max-age=3600"}
 	for i, v := range expectedValues {
 		if headers["Cache-Control"][i] != v {
@@ -92,13 +92,13 @@ func TestHeaderOverwrite(t *testing.T) {
 func TestEmptyHeader(t *testing.T) {
 	headers := make(Header)
 
-	// Probar obtener un encabezado inexistente
+	// Test getting a non-existent header
 	value := headers.Get("Non-Existent-Header")
 	if value != "" {
 		t.Errorf("Expected empty string for non-existent header, got '%s'", value)
 	}
 
-	// Verificar que un encabezado no existe
+	// Verify that a header does not exist
 	if len(headers) != 0 {
 		t.Errorf("Expected empty header map, got %v", headers)
 	}

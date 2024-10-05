@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestStaticRoute verifica que una ruta estática funcione como se espera.
+// TestStaticRoute verifies that a static route works as expected.
 func TestStaticRoute(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -32,7 +32,7 @@ func TestStaticRoute(t *testing.T) {
 	}
 }
 
-// TestDynamicRoute verifica que las rutas dinámicas funcionen correctamente.
+// TestDynamicRoute verifies that dynamic routes work correctly.
 func TestDynamicRoute(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -61,7 +61,7 @@ func TestDynamicRoute(t *testing.T) {
 	}
 }
 
-// TestRouteNotFound verifica que un 404 sea devuelto cuando no se encuentra una ruta.
+// TestRouteNotFound verifies that a 404 is returned when a route is not found.
 func TestRouteNotFound(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -84,7 +84,7 @@ func TestRouteNotFound(t *testing.T) {
 	}
 }
 
-// TestMethodNotAllowed verifica que se devuelva un 404 si el método no está permitido para la ruta.
+// TestMethodNotAllowed verifies that a 404 is returned if the method is not allowed for the route.
 func TestMethodNotAllowed(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -94,7 +94,7 @@ func TestMethodNotAllowed(t *testing.T) {
 	})
 
 	req := &Request{
-		Method: POST, // POST no está permitido para esta ruta
+		Method: POST, // POST is not allowed for this route
 		URL:    &url.URL{Path: "/api/test"},
 	}
 
@@ -102,7 +102,7 @@ func TestMethodNotAllowed(t *testing.T) {
 
 	mux.ServeHTTP(res, req)
 
-	// Verifica que devuelva un 404 porque POST no está permitido
+	// Verify that a 404 is returned because POST is not allowed
 	if res.status != StatusNotFound {
 		t.Errorf("Expected status %d, got %d", StatusNotFound, res.status)
 	}
@@ -113,11 +113,11 @@ func TestMethodNotAllowed(t *testing.T) {
 	}
 }
 
-// TestMiddleware verifica que el middleware sea aplicado correctamente.
+// TestMiddleware verifies that middleware is applied correctly.
 func TestMiddleware(t *testing.T) {
 	mux := NewServeMux(nil)
 
-	// Middleware que agrega un encabezado a la respuesta.
+	// Middleware that adds a header to the response.
 	mux.Use(func(next func(ResponseWriter, *Request)) func(ResponseWriter, *Request) {
 		return func(w ResponseWriter, r *Request) {
 			w.Header().Set("X-Middleware", "true")
@@ -143,7 +143,7 @@ func TestMiddleware(t *testing.T) {
 		t.Errorf("Expected status %d, got %d", StatusOK, res.status)
 	}
 
-	// Verificar que el middleware ha modificado los encabezados
+	// Verify that the middleware has modified the headers
 	if res.Header().Get("X-Middleware") != "true" {
 		t.Errorf("Expected 'X-Middleware' header to be 'true', got '%s'", res.Header().Get("X-Middleware"))
 	}
@@ -154,14 +154,14 @@ func TestMiddleware(t *testing.T) {
 	}
 }
 
-// TestDefaultHandler verifica que el manejador por defecto sea llamado para rutas no encontradas.
+// TestDefaultHandler verifies that the default handler is called for not found routes.
 func TestDefaultHandler(t *testing.T) {
 	mux := NewServeMux(nil)
 
-	// Definir un manejador por defecto para rutas no registradas
+	// Define a default handler for unregistered routes
 	mux.SetDefaultHandler(func(w ResponseWriter, r *Request) {
 		w.WriteHeader(StatusNotFound)
-		w.Write([]byte("Not Found\n")) // Ajustado para que coincida con el comportamiento actual
+		w.Write([]byte("Not Found\n")) // Adjusted to match current behavior
 	})
 
 	req := &Request{
@@ -183,11 +183,11 @@ func TestDefaultHandler(t *testing.T) {
 	}
 }
 
-// TestErrorHandler verifica que el manejador de errores personalizado sea utilizado.
+// TestErrorHandler verifies that the custom error handler is used.
 func TestErrorHandler(t *testing.T) {
 	mux := NewServeMux(nil)
 
-	// Definir un manejador de errores personalizado
+	// Define a custom error handler
 	mux.SetErrorHandler(func(w ResponseWriter, r *Request, statusCode int) {
 		w.WriteHeader(statusCode)
 		w.Write([]byte("Error " + StatusText(statusCode)))
@@ -212,7 +212,7 @@ func TestErrorHandler(t *testing.T) {
 	}
 }
 
-// TestConcurrentRequests verifica que el multiplexor pueda manejar solicitudes concurrentes.
+// TestConcurrentRequests verifies that the multiplexer can handle concurrent requests.
 func TestConcurrentRequests(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -226,7 +226,7 @@ func TestConcurrentRequests(t *testing.T) {
 		URL:    &url.URL{Path: "/api/concurrent"},
 	}
 
-	concurrencyLevel := 50 // Nivel de concurrencia
+	concurrencyLevel := 50 // Concurrency level
 	done := make(chan bool, concurrencyLevel)
 
 	for i := 0; i < concurrencyLevel; i++ {
@@ -251,7 +251,7 @@ func TestConcurrentRequests(t *testing.T) {
 	}
 }
 
-// TestAddRouteWithDifferentMethods verifica que se puedan agregar rutas con diferentes métodos HTTP.
+// TestAddRouteWithDifferentMethods verifies that routes can be added with different HTTP methods.
 func TestAddRouteWithDifferentMethods(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -260,7 +260,7 @@ func TestAddRouteWithDifferentMethods(t *testing.T) {
 		w.Write([]byte("This is a route with multiple methods"))
 	})
 
-	// Verificar GET
+	// Verify GET
 	reqGet := &Request{
 		Method: GET,
 		URL:    &url.URL{Path: "/api/test"},
@@ -277,7 +277,7 @@ func TestAddRouteWithDifferentMethods(t *testing.T) {
 		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(resGet.body))
 	}
 
-	// Verificar POST
+	// Verify POST
 	reqPost := &Request{
 		Method: POST,
 		URL:    &url.URL{Path: "/api/test"},

@@ -20,47 +20,47 @@ type MockConn struct {
 	writeBuffer bytes.Buffer
 }
 
-// Write simula escribir datos en la conexión.
+// Write simulates writing data to the connection.
 func (mc *MockConn) Write(b []byte) (n int, err error) {
 	return mc.writeBuffer.Write(b)
 }
 
-// Read no se utiliza en estas pruebas, pero se incluye para cumplir la interfaz de net.Conn.
+// Read is not used in these tests, but is included to fulfill the net.Conn interface.
 func (mc *MockConn) Read(b []byte) (n int, err error) {
 	return 0, nil
 }
 
-// Close no hace nada en la simulación, pero cumple con la interfaz de net.Conn.
+// Close does nothing in the simulation, but fulfills the net.Conn interface.
 func (mc *MockConn) Close() error {
 	return nil
 }
 
-// LocalAddr devuelve una dirección simulada.
+// LocalAddr returns a simulated address.
 func (mc *MockConn) LocalAddr() net.Addr {
 	return nil
 }
 
-// RemoteAddr devuelve una dirección simulada.
+// RemoteAddr returns a simulated address.
 func (mc *MockConn) RemoteAddr() net.Addr {
 	return nil
 }
 
-// SetDeadline simula establecer un tiempo límite para las operaciones de lectura y escritura.
+// SetDeadline simulates setting a deadline for read and write operations.
 func (mc *MockConn) SetDeadline(t time.Time) error {
 	return nil
 }
 
-// SetReadDeadline simula establecer un tiempo límite para las operaciones de lectura.
+// SetReadDeadline simulates setting a deadline for read operations.
 func (mc *MockConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-// SetWriteDeadline simula establecer un tiempo límite para las operaciones de escritura.
+// SetWriteDeadline simulates setting a deadline for write operations.
 func (mc *MockConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-// MockResponseWriter es una implementación de ResponseWriter que captura respuestas para pruebas.
+// MockResponseWriter is an implementation of ResponseWriter that captures responses for testing.
 type MockResponseWriter struct {
 	headers Header
 	body    []byte
