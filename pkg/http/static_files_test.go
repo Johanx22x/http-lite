@@ -10,7 +10,6 @@ import (
 
 // TestServeStaticFile verifica que el servidor puede servir un archivo estático.
 func TestServeStaticFile(t *testing.T) {
-	// Crear un archivo temporal que actuará como nuestro archivo estático
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "testfile.html")
 	content := []byte("<html><body>Hello, Static World!</body></html>")
@@ -21,7 +20,6 @@ func TestServeStaticFile(t *testing.T) {
 	}
 	defer os.Remove(tmpFile) // Limpia el archivo después de la prueba
 
-	// Crear un mux con el directorio estático configurado
 	mux := NewServeMux(&tmpDir)
 
 	req := &Request{
@@ -31,7 +29,6 @@ func TestServeStaticFile(t *testing.T) {
 
 	res := &MockResponseWriter{headers: make(Header)}
 
-	// Servir el archivo estático
 	mux.ServeHTTP(res, req)
 
 	if res.status != StatusOK {
@@ -42,7 +39,6 @@ func TestServeStaticFile(t *testing.T) {
 		t.Errorf("Expected body '%s', got '%s'", string(content), string(res.body))
 	}
 
-	// Verifica que el Content-Type sea text/html
 	expectedContentType := "text/html"
 	actualContentType := res.Header().Get("Content-Type")
 	if actualContentType != expectedContentType {
@@ -54,7 +50,6 @@ func TestServeStaticFile(t *testing.T) {
 func TestServeStaticFileNotFound(t *testing.T) {
 	tmpDir := os.TempDir()
 
-	// Crear un mux con el directorio estático configurado
 	mux := NewServeMux(&tmpDir)
 
 	req := &Request{
@@ -64,14 +59,12 @@ func TestServeStaticFileNotFound(t *testing.T) {
 
 	res := &MockResponseWriter{headers: make(Header)}
 
-	// Intentar servir un archivo inexistente
 	mux.ServeHTTP(res, req)
 
 	if res.status != StatusNotFound {
 		t.Errorf("Expected status %d, got %d", StatusNotFound, res.status)
 	}
 
-	// Verificar que el cuerpo de la respuesta sea el correcto
 	expectedBody := "Not Found\n"
 	if string(res.body) != expectedBody {
 		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(res.body))
@@ -80,7 +73,6 @@ func TestServeStaticFileNotFound(t *testing.T) {
 
 // TestServeIndexFile verifica que el servidor sirve index.html cuando se accede a una ruta raíz.
 func TestServeIndexFile(t *testing.T) {
-	// Crear un archivo temporal llamado index.html
 	tmpDir := os.TempDir()
 	indexFile := filepath.Join(tmpDir, "index.html")
 	content := []byte("<html><body>Welcome to the index!</body></html>")
@@ -91,7 +83,6 @@ func TestServeIndexFile(t *testing.T) {
 	}
 	defer os.Remove(indexFile) // Limpia el archivo después de la prueba
 
-	// Crear un mux con el directorio estático configurado
 	mux := NewServeMux(&tmpDir)
 
 	req := &Request{
@@ -101,7 +92,6 @@ func TestServeIndexFile(t *testing.T) {
 
 	res := &MockResponseWriter{headers: make(Header)}
 
-	// Servir el archivo index.html
 	mux.ServeHTTP(res, req)
 
 	if res.status != StatusOK {
@@ -115,7 +105,6 @@ func TestServeIndexFile(t *testing.T) {
 
 // TestServeStaticFileWithCustomExtension verifica que se sirvan archivos con extensiones personalizadas.
 func TestServeStaticFileWithCustomExtension(t *testing.T) {
-	// Crear un archivo temporal con una extensión personalizada
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "customfile.xyz")
 	content := []byte("This is a custom file")
@@ -124,9 +113,8 @@ func TestServeStaticFileWithCustomExtension(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary custom file: %v", err)
 	}
-	defer os.Remove(tmpFile) // Limpia el archivo después de la prueba
+	defer os.Remove(tmpFile)
 
-	// Crear un mux con el directorio estático configurado
 	mux := NewServeMux(&tmpDir)
 
 	req := &Request{
@@ -136,7 +124,6 @@ func TestServeStaticFileWithCustomExtension(t *testing.T) {
 
 	res := &MockResponseWriter{headers: make(Header)}
 
-	// Servir el archivo estático con una extensión personalizada
 	mux.ServeHTTP(res, req)
 
 	if res.status != StatusOK {
@@ -147,10 +134,57 @@ func TestServeStaticFileWithCustomExtension(t *testing.T) {
 		t.Errorf("Expected body '%s', got '%s'", string(content), string(res.body))
 	}
 
-	// Verifica que el Content-Type sea "application/octet-stream" (valor por defecto para extensiones desconocidas)
 	expectedContentType := "application/octet-stream"
 	actualContentType := res.Header().Get("Content-Type")
 	if actualContentType != expectedContentType {
 		t.Errorf("Expected Content-Type '%s', got '%s'", expectedContentType, actualContentType)
+	}
+}
+
+// TestServeStaticFileWithError verifica el manejo de errores al intentar leer un archivo inexistente.
+func TestServeStaticFileWithError(t *testing.T) {
+	mux := NewServeMux(nil) // No se configura ningún directorio estático
+
+	req := &Request{
+		Method: GET,
+		URL:    &url.URL{Path: "/testfile.html"},
+	}
+
+	res := &MockResponseWriter{headers: make(Header)}
+
+	mux.ServeHTTP(res, req)
+
+	if res.status != StatusNotFound {
+		t.Errorf("Expected status %d, got %d", StatusNotFound, res.status)
+	}
+
+	expectedBody := "Not Found\n"
+	if string(res.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(res.body))
+	}
+}
+
+// TestServeEmptyStaticDir verifica que el servidor maneje correctamente un directorio vacío.
+func TestServeEmptyStaticDir(t *testing.T) {
+	tmpDir := os.TempDir() // Usamos el directorio temporal vacío
+
+	mux := NewServeMux(&tmpDir)
+
+	req := &Request{
+		Method: GET,
+		URL:    &url.URL{Path: "/emptyfile.html"},
+	}
+
+	res := &MockResponseWriter{headers: make(Header)}
+
+	mux.ServeHTTP(res, req)
+
+	if res.status != StatusNotFound {
+		t.Errorf("Expected status %d, got %d", StatusNotFound, res.status)
+	}
+
+	expectedBody := "Not Found\n"
+	if string(res.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(res.body))
 	}
 }
