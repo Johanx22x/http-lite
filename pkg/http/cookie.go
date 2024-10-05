@@ -1,10 +1,7 @@
 package http
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
-	"strings"
+	"strconv"
 	"time"
 )
 
@@ -20,82 +17,26 @@ type Cookie struct {
 	HttpOnly bool
 }
 
-// SetCookie writes the Set-Cookie header in the response to set a cookie.
-func SetCookie(w ResponseWriter, cookie *Cookie) error {
-	if cookie.Name == "" {
-		return errors.New("cookie name cannot be empty")
+// String returns a string representation of the cookie.
+func (c *Cookie) String() string {
+	cookieStr := c.Name + "=" + c.Value
+	if c.Path != "" {
+		cookieStr += "; Path=" + c.Path
 	}
-
-	cookieString := cookieToString(cookie)
-	headers := w.Header()
-	headers["Set-Cookie"] = append(headers["Set-Cookie"], cookieString)
-	return nil
-}
-
-// cookieToString converts a Cookie struct to a string following the cookie format.
-func cookieToString(cookie *Cookie) string {
-	cookieString := cookie.Name + "=" + cookie.Value
-
-	if cookie.Path != "" {
-		cookieString += "; Path=" + cookie.Path
+	if c.Domain != "" {
+		cookieStr += "; Domain=" + c.Domain
 	}
-
-	if cookie.Domain != "" {
-		cookieString += "; Domain=" + cookie.Domain
+	if !c.Expires.IsZero() {
+		cookieStr += "; Expires=" + c.Expires.Format(time.RFC1123)
 	}
-
-	if !cookie.Expires.IsZero() {
-		cookieString += "; Expires=" + cookie.Expires.UTC().Format(http.TimeFormat)
+	if c.MaxAge > 0 {
+		cookieStr += "; Max-Age=" + strconv.Itoa(c.MaxAge)
 	}
-
-	if cookie.MaxAge > 0 {
-		cookieString += "; Max-Age=" + fmt.Sprint(cookie.MaxAge)
+	if c.Secure {
+		cookieStr += "; Secure"
 	}
-
-	if cookie.Secure {
-		cookieString += "; Secure"
+	if c.HttpOnly {
+		cookieStr += "; HttpOnly"
 	}
-
-	if cookie.HttpOnly {
-		cookieString += "; HttpOnly"
-	}
-
-	return cookieString
-}
-
-// GetCookie retrieves the value of a cookie from the request.
-func GetCookie(r *Request, name string) (*Cookie, error) {
-	for _, cookie := range r.Header["Cookie"] {
-		if cookieValue, err := parseCookie(cookie, name); err == nil {
-			return cookieValue, nil
-		} else if err == http.ErrNoCookie {
-			continue
-		} else {
-			return nil, err
-		}
-	}
-	return nil, http.ErrNoCookie
-}
-
-// parseCookie parses the raw cookie header to find the cookie by name.
-func parseCookie(rawCookie string, name string) (*Cookie, error) {
-	cookieParts := strings.Split(rawCookie, "; ")
-	for _, part := range cookieParts {
-		if strings.HasPrefix(part, name+"=") {
-			value := strings.TrimPrefix(part, name+"=")
-			return &Cookie{Name: name, Value: value}, nil
-		}
-	}
-	return nil, http.ErrNoCookie
-}
-
-// DeleteCookie sets a cookie with an expiration in the past, effectively deleting it.
-func DeleteCookie(w ResponseWriter, name string, path string) error {
-	expiredCookie := &Cookie{
-		Name:    name,
-		Value:   "",
-		Path:    path,
-		Expires: time.Unix(0, 0),
-	}
-	return SetCookie(w, expiredCookie)
+	return cookieStr
 }

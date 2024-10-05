@@ -22,7 +22,7 @@ func sendRequest(wg *sync.WaitGroup, url string) {
 func main() {
 	var wg sync.WaitGroup
 	routes := []string{
-		"http://localhost:8080/api/test",
+		"http://localhost:8080/api/exchange",
 	}
 
 	// Definir la cantidad de solicitudes por ruta

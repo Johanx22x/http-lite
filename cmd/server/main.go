@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/Johanx22x/http-lite/cmd/server/middleware"
@@ -26,47 +28,25 @@ func main() {
 	mux.Use(http.LoggingMiddleware)
 	mux.Use(middleware.CORS)
 
-	// Routes
-	mux.AddRoute("/api/test", []string{http.GET},
+	// US Dollar to CRC exchange rate endpoint
+	mux.AddRoute("/api/exchange", []string{http.GET},
 		func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Hello, World!"))
-		},
-	)
+			// Random rate
+			rate := 550 + rand.Intn(100) - 50
+			response := `{"rate": ` + strconv.Itoa(rate) + `}`
 
-	mux.AddRoute("/api/set-cookie", []string{http.POST},
-		func(w http.ResponseWriter, r *http.Request) {
-			token := "abc123" // Aquí deberías generar tu token de sesión
-			cookie := &http.Cookie{
-				Name:     "session_token",
-				Value:    token,
-				Path:     "/",
-				Expires:  time.Now().Add(1 * time.Hour),
-				HttpOnly: true,
-				Secure:   false, // Cambia a true si usas HTTPS
-			}
-			err := http.SetCookie(w, cookie)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error setting cookie"))
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Cookie set"))
-		},
-	)
+			// Set the rate in a cookie
+			w.SetCookie(&http.Cookie{Name: "last-rate", Value: strconv.Itoa(rate), Expires: time.Now().Add(24 * time.Hour)})
 
-	mux.AddRoute("/api/delete-cookie", []string{http.DELETE},
-		func(w http.ResponseWriter, r *http.Request) {
-			http.DeleteCookie(w, "session_token", "/")
+			// Write the response
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Cookie deleted"))
+			w.Write([]byte(response))
 		},
 	)
 
 	// Start server
-	address := ":" + port
-	err := http.Run(address, mux)
+	err := http.Run(":"+port, mux)
 	if err != nil {
 		log.Fatalf("Error al iniciar el servidor: %v", err)
 		os.Exit(1)

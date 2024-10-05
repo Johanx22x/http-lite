@@ -1,15 +1,16 @@
 package http
 
+// Header represents an HTTP header.
 type Header map[string][]string
 
-// Set establece el valor de un encabezado.
+// Set sets a header field.
 func (h Header) Set(key, value string) {
-	h[key] = []string{value}
+	h[key] = append(h[key], value)
 }
 
-// Get obtiene el primer valor de un encabezado.
+// Get returns a header field.
 func (h Header) Get(key string) string {
-	if values, ok := h[key]; ok && len(values) > 0 {
+	if values, ok := h[key]; ok {
 		return values[0]
 	}
 	return ""

@@ -2,19 +2,26 @@ package http
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 )
 
+// HandlerFunc is a function that handles an HTTP request.
 type HandlerFunc func(ResponseWriter, *Request)
 
+// ServeHTTP calls f(w, r).
+// It's used to satisfy the Handler interface.
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
@@ -23,11 +30,13 @@ type Handler interface {
 type Middleware func(func(ResponseWriter, *Request)) func(ResponseWriter, *Request)
 
 type Server struct {
-	Addr           string
-	Handler        Handler
-	isShuttingDown bool
+	Addr    string
+	Handler Handler
+	mu      sync.Mutex
+	wg      sync.WaitGroup
 }
 
+// NewServer creates a new HTTP server with the given address and handler.
 func NewServer(addr string, handler Handler) *Server {
 	return &Server{
 		Addr:    addr,
@@ -35,13 +44,37 @@ func NewServer(addr string, handler Handler) *Server {
 	}
 }
 
-// parseRequest parses the incoming HTTP request from a net.Conn and returns a Request object.
-func parseRequest(buffer []byte) (*Request, error) {
-	reader := bufio.NewReader(strings.NewReader(string(buffer)))
+// parseRequest reads and parses an HTTP request from a connection.
+func parseRequest(ctx context.Context, conn net.Conn) (*Request, error) {
+	reader := bufio.NewReader(conn)
 
+	// Create a channel to signal when the request parsing is done
+	done := make(chan struct{})
+	var req *Request
+	var err error
+
+	go func() {
+		defer close(done)
+		req, err = parseRequestWithTimeout(reader)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-done:
+		return req, err
+	}
+}
+
+// parseRequestWithTimeout reads and parses an HTTP request from a connection with a timeout.
+func parseRequestWithTimeout(reader *bufio.Reader) (*Request, error) {
 	// Read the request line (e.g., "GET /path HTTP/1.1")
 	line, err := reader.ReadString('\n')
 	if err != nil {
+		if err == io.EOF {
+			return nil, err
+		}
+
 		return nil, fmt.Errorf("failed to read request line: %w", err)
 	}
 
@@ -68,6 +101,7 @@ func parseRequest(buffer []byte) (*Request, error) {
 
 	// Parse headers
 	headers := make(Header)
+	var cookies []Cookie
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -79,69 +113,67 @@ func parseRequest(buffer []byte) (*Request, error) {
 			break
 		}
 
-		// Parse header line (e.g., "Content-Type: text/plain")
-		colonIndex := strings.Index(line, ":")
-		if colonIndex == -1 {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
 			return nil, fmt.Errorf("malformed header line")
 		}
-		name := strings.TrimSpace(line[:colonIndex])
-		value := strings.TrimSpace(line[colonIndex+1:])
-		headers[name] = append(headers[name], value)
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		headers[key] = append(headers[key], value)
+
+		if key == "Cookie" {
+			cookies = append(cookies, parseCookies(value)...)
+		}
 	}
 
-	// Parse body (if there is one)
-	var body io.ReadCloser = nil
-	if method == "POST" || method == "PUT" {
-		// Pass the reader itself as the body to be read later
-		body = io.NopCloser(reader)
-	}
-
-	// Construct and return the request
 	return &Request{
-		Method: method,
-		URL:    parsedURL,
-		Proto:  proto,
-		Header: headers,
-		Body:   body,
+		Method:  method,
+		URL:     parsedURL,
+		Proto:   proto,
+		Header:  headers,
+		Cookies: cookies,
 	}, nil
 }
 
-func (s *Server) handleConn(conn net.Conn) {
-	defer conn.Close()
-
-	// Read request
-	const size = 64 << 10
-	buffer := make([]byte, size)
-	n, err := conn.Read(buffer)
-	if err != nil && err != io.EOF {
-		fmt.Println("Error reading from connection:", err)
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))))
-		return
+// parseCookies parses a cookie header string and returns a slice of cookies.
+func parseCookies(cookieHeader string) []Cookie {
+	var cookies []Cookie
+	parts := strings.Split(cookieHeader, ";")
+	for _, part := range parts {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) == 2 {
+			cookies = append(cookies, Cookie{Name: kv[0], Value: kv[1]})
+		}
 	}
+	return cookies
+}
 
-	// Trim buffer to actual size
-	buffer = buffer[:n]
+// handleConn reads and parses an HTTP request from a connection and calls the handler.
+func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
+	defer conn.Close()
+	s.wg.Add(1)
+	defer s.wg.Done()
 
-	// Parse request
-	if n > 0 {
-		req, err := parseRequest(buffer)
-		if err != nil {
-			fmt.Println("Error parsing request:", err)
-			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
+	req, err := parseRequest(ctx, conn)
+	if err != nil {
+		if err == io.EOF {
 			return
 		}
 
-		// Create a ResponseWriter tied to the current connection
-		res := NewResponseWriter(conn)
-
-		// Pass the ResponseWriter and Request to the handler
-		s.Handler.ServeHTTP(res, req)
-	} else {
-		// Bad request
+		fmt.Println("Error parsing request:", err)
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\n", http.StatusBadRequest, http.StatusText(http.StatusBadRequest))))
+		return
 	}
+
+	// Create a ResponseWriter tied to the current connection
+	res := NewResponseWriter(conn)
+
+	// Pass the ResponseWriter and Request to the handler
+	s.Handler.ServeHTTP(res, req)
 }
 
+// listenAndServe listens on the TCP network address and handles incoming connections.
 func (s *Server) listenAndServe() error {
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -152,30 +184,36 @@ func (s *Server) listenAndServe() error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			if s.isShuttingDown {
-				fmt.Println("Server has shut down")
-				return http.ErrServerClosed
-			}
-			return err
+			log.Println("Error accepting connection:", err)
+			continue
 		}
-		go s.handleConn(conn)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		go func() {
+			defer cancel()
+			s.handleConn(ctx, conn)
+		}()
 	}
 }
 
-func (s *Server) Shutdown() error {
-	s.isShuttingDown = true
+// Shutdown gracefully closes the server and waits for ongoing connections to finish
+func (s *Server) Shutdown() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	fmt.Println("Shutting down server...")
-	return nil
+	s.wg.Wait() // Wait for all connections to finish
 }
 
+// handleSignals listens for SIGINT and SIGTERM signals to gracefully shutdown the server
 func (s *Server) handleSignals(quit chan os.Signal) {
 	<-quit
-	if err := s.Shutdown(); err != nil {
-		fmt.Printf("Error during shutdown: %v\n", err)
-	}
+	s.Shutdown()
 	os.Exit(0)
 }
 
+// Run starts an HTTP server with the given address and handler.
 func Run(addr string, handler Handler) error {
 	server := NewServer(addr, handler)
 
@@ -190,6 +228,7 @@ func Run(addr string, handler Handler) error {
 	return server.listenAndServe()
 }
 
+// Error writes an HTTP error response with the given message and status code.
 func Error(w ResponseWriter, m string, statusCode int) {
 	w.WriteHeader(statusCode)
 	fmt.Fprintln(w, m)
