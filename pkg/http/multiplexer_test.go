@@ -84,7 +84,7 @@ func TestRouteNotFound(t *testing.T) {
 	}
 }
 
-// TestMethodNotAllowed verifica que un 404 sea devuelto si el método no está permitido para la ruta.
+// TestMethodNotAllowed verifica que se devuelva un 404 si el método no está permitido para la ruta.
 func TestMethodNotAllowed(t *testing.T) {
 	mux := NewServeMux(nil)
 
@@ -248,5 +248,48 @@ func TestConcurrentRequests(t *testing.T) {
 
 	for i := 0; i < concurrencyLevel; i++ {
 		<-done
+	}
+}
+
+// TestAddRouteWithDifferentMethods verifica que se puedan agregar rutas con diferentes métodos HTTP.
+func TestAddRouteWithDifferentMethods(t *testing.T) {
+	mux := NewServeMux(nil)
+
+	mux.AddRoute("/api/test", []string{GET, POST}, func(w ResponseWriter, r *Request) {
+		w.WriteHeader(StatusOK)
+		w.Write([]byte("This is a route with multiple methods"))
+	})
+
+	// Verificar GET
+	reqGet := &Request{
+		Method: GET,
+		URL:    &url.URL{Path: "/api/test"},
+	}
+	resGet := &MockResponseWriter{headers: make(Header)}
+	mux.ServeHTTP(resGet, reqGet)
+
+	if resGet.status != StatusOK {
+		t.Errorf("Expected status %d, got %d", StatusOK, resGet.status)
+	}
+
+	expectedBody := "This is a route with multiple methods"
+	if string(resGet.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(resGet.body))
+	}
+
+	// Verificar POST
+	reqPost := &Request{
+		Method: POST,
+		URL:    &url.URL{Path: "/api/test"},
+	}
+	resPost := &MockResponseWriter{headers: make(Header)}
+	mux.ServeHTTP(resPost, reqPost)
+
+	if resPost.status != StatusOK {
+		t.Errorf("Expected status %d, got %d", StatusOK, resPost.status)
+	}
+
+	if string(resPost.body) != expectedBody {
+		t.Errorf("Expected body '%s', got '%s'", expectedBody, string(resPost.body))
 	}
 }
